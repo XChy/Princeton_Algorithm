@@ -1,16 +1,35 @@
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 
 public class Board {
-    int[][] tiles;
+    private int[][] tiles;
+    private int emptyRow, emptyCol;
+    private int hammingValue;
+    private int mahattanValue;
 
     // create a board from an n-by-n array of tiles,
     // where tiles[row][col] = tile at (row, col)
     public Board(int[][] tiles) {
         this.tiles = new int[tiles.length][tiles.length];
+        hammingValue = 0;
+        mahattanValue = 0;
+
         for (int i = 0; i < tiles.length; i++) {
             for (int j = 0; j < tiles.length; j++) {
                 this.tiles[i][j] = tiles[i][j];
+                if (tiles[i][j] != 0) {
+                    // compute mahattan
+                    mahattanValue += manhattanOf(i, j);
+                    // compute hamming
+                    if (tiles[i][j] != (i * tiles.length + j + 1)) {
+                        hammingValue++;
+                    }
+                }
+                else {
+                    emptyRow = i;
+                    emptyCol = j;
+                }
             }
         }
     }
@@ -35,28 +54,12 @@ public class Board {
 
     // number of tiles out of place
     public int hamming() {
-        int num = 0;
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles.length; j++) {
-                if (tiles[i][j] != (j * tiles.length + i + 1) && tiles[i][j] != 0) {
-                    num++;
-                }
-            }
-        }
-        return num;
+        return hammingValue;
     }
 
     // sum of Manhattan distances between tiles and goal
     public int manhattan() {
-        int distance = 0;
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles.length; j++) {
-                if (tiles[i][j] != 0) {
-                    distance += manhattanOf(i, j);
-                }
-            }
-        }
-        return distance;
+        return mahattanValue;
     }
 
     private int manhattanOf(int row, int col) {
@@ -73,7 +76,10 @@ public class Board {
 
     // does this board equal y?
     public boolean equals(Object y) {
-        if (!Board.class.isInstance(y)) {
+        if (y == null) {
+            return false;
+        }
+        if (getClass() != y.getClass()) {
             return false;
         }
 
@@ -82,67 +88,42 @@ public class Board {
             return false;
         }
 
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles.length; j++) {
-                if (this.tiles[i][j] != y0.tiles[i][j]) {
-                    return false;
-                }
-            }
+        if (emptyRow != y0.emptyRow || emptyCol != y0.emptyCol) {
+            return false;
         }
 
-        return true;
+        return Arrays.deepEquals(tiles, y0.tiles);
     }
 
     // all neighboring boards
     public Iterable<Board> neighbors() {
-        return new BoardNeighbors();
-    }
+        ArrayList<Board> neighbors = new ArrayList<>(4);
 
-    private class BoardNeighbors implements Iterable<Board> {
-
-        public Iterator<Board> iterator() {
-            return neighbors.iterator();
+        if (emptyRow != 0) {
+            exchange(tiles, emptyRow, emptyCol, emptyRow - 1, emptyCol);
+            Board board = new Board(tiles);
+            exchange(tiles, emptyRow, emptyCol, emptyRow - 1, emptyCol);
+            neighbors.add(board);
         }
-
-        int row, col;// the pos of 0
-        ArrayList<Board> neighbors;
-
-        public BoardNeighbors() {
-            for (int i = 0; i < tiles.length; i++) {
-                for (int j = 0; j < tiles.length; j++) {
-                    if (tiles[i][j] == 0) {
-                        row = i;
-                        col = j;
-                        break;
-                    }
-                }
-            }
-
-            neighbors = new ArrayList<>();
-
-            if (row != 0) {
-                Board board = new Board(tiles);
-                board.exchange(row, col, row - 1, col);
-                neighbors.add(board);
-            }
-            if (row != tiles.length - 1) {
-                Board board = new Board(tiles);
-                board.exchange(row, col, row + 1, col);
-                neighbors.add(board);
-            }
-            if (col != 0) {
-                Board board = new Board(tiles);
-                board.exchange(row, col, row, col - 1);
-                neighbors.add(board);
-            }
-            if (col != tiles.length - 1) {
-                Board board = new Board(tiles);
-                board.exchange(row, col, row, col + 1);
-                neighbors.add(board);
-            }
+        if (emptyRow != tiles.length - 1) {
+            exchange(tiles, emptyRow, emptyCol, emptyRow + 1, emptyCol);
+            Board board = new Board(tiles);
+            exchange(tiles, emptyRow, emptyCol, emptyRow + 1, emptyCol);
+            neighbors.add(board);
         }
-
-
+        if (emptyCol != 0) {
+            exchange(tiles, emptyRow, emptyCol, emptyRow, emptyCol - 1);
+            Board board = new Board(tiles);
+            exchange(tiles, emptyRow, emptyCol, emptyRow, emptyCol - 1);
+            neighbors.add(board);
+        }
+        if (emptyCol != tiles.length - 1) {
+            exchange(tiles, emptyRow, emptyCol, emptyRow, emptyCol + 1);
+            Board board = new Board(tiles);
+            exchange(tiles, emptyRow, emptyCol, emptyRow, emptyCol + 1);
+            neighbors.add(board);
+        }
+        return neighbors;
     }
 
     // a board that is obtained by exchanging any pair of tiles
@@ -151,13 +132,13 @@ public class Board {
         if (tiles[row][col] == 0 || tiles[row][col + 1] == 0) {
             row++;
         }
-        exchange(row, col, row, col + 1);
+        exchange(tiles, row, col, row, col + 1);
         Board twinBoard = new Board(this.tiles);
-        exchange(row, col, row, col + 1);
+        exchange(tiles, row, col, row, col + 1);
         return twinBoard;
     }
 
-    private void exchange(int i, int j, int k, int m) {
+    private static void exchange(int[][] tiles, int i, int j, int k, int m) {
         int temp = tiles[i][j];
         tiles[i][j] = tiles[k][m];
         tiles[k][m] = temp;
@@ -166,9 +147,9 @@ public class Board {
     // unit testing (not graded)
     public static void main(String[] args) {
         int[][] boardArray = {
-                { 8, 1, 3 },
-                { 4, 0, 2 },
-                { 7, 6, 5 }
+                { 0, 1, 3 },
+                { 4, 2, 5 },
+                { 7, 8, 6 }
         };
         Board board = new Board(boardArray);
         System.out.println(board.toString());
