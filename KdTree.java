@@ -1,28 +1,25 @@
 import edu.princeton.cs.algs4.Point2D;
 import edu.princeton.cs.algs4.RectHV;
+import edu.princeton.cs.algs4.StdOut;
 
 import java.util.ArrayList;
 
 public class KdTree {
     private class TreeNode {
+
+        public TreeNode left;
+        public TreeNode right;
+        public Point2D point;
+        public RectHV rect;
+        public boolean isVertical;
+
         public TreeNode() {
-
-        }
-
-        public TreeNode(TreeNode parent) {
-            this.parent = parent;
-            this.isVertical = !parent.isVertical;
         }
 
         public TreeNode(boolean isVertical) {
             this.isVertical = isVertical;
         }
 
-        public TreeNode parent;
-        public TreeNode left;
-        public TreeNode right;
-        public Point2D point;
-        public boolean isVertical;
     }
 
     private TreeNode root;
@@ -48,33 +45,71 @@ public class KdTree {
     {
         if (p == null)
             throw new IllegalArgumentException();
-        // TODO: complete insert part
+        if (!contains(p)) {
+            root = insert(root, null, p);
+            size++;
+        }
     }
 
-    private TreeNode insert(TreeNode node, Point2D p, boolean isVertical) {
+    private TreeNode insert(TreeNode node, TreeNode parent, Point2D p) {
         if (node == null) {
-            TreeNode insertedNode = new TreeNode(isVertical);
-            return insertedNode;
-        }
-
-        if (node.isVertical) {
-            if (p.x() < node.point.x()) {
-                node.left = insert(node.left, p, !isVertical);
+            if (parent == null) {
+                TreeNode insertedNode = new TreeNode(true);
+                insertedNode.point = p;
+                insertedNode.rect = new RectHV(0, 0, 1, 1);
+                return insertedNode;
             }
             else {
-                node.right = insert(node.right, p, !isVertical);
+                boolean isleft = isLeft(parent, p);
+                TreeNode insertedNode = new TreeNode(!parent.isVertical);
+                insertedNode.point = p;
+
+                if (parent.isVertical) {
+                    if (isleft)
+                        insertedNode.rect = new RectHV(parent.rect.xmin(), parent.rect.ymin(),
+                                                       parent.point.x(), parent.rect.ymax());
+                    else
+                        insertedNode.rect = new RectHV(parent.point.x(), parent.rect.ymin(),
+                                                       parent.rect.xmax(), parent.rect.ymax());
+                }
+                else {// Horizonally splitted
+                    if (isleft)
+                        insertedNode.rect = new RectHV(parent.rect.xmin(), parent.rect.ymin(),
+                                                       parent.rect.xmax(), parent.point.y());
+                    else
+                        insertedNode.rect = new RectHV(parent.rect.xmin(), parent.point.y(),
+                                                       parent.rect.xmax(), parent.rect.ymax());
+                }
+                return insertedNode;
+            }
+        }
+
+        boolean isleft = isLeft(node, p);
+        if (isleft)
+            node.left = insert(node.left, node, p);
+        else
+            node.right = insert(node.right, node, p);
+
+        return node;
+    }
+
+    private boolean isLeft(TreeNode node, Point2D p) {
+        if (node.isVertical) {
+            if (p.x() <= node.point.x()) {
+                return true;
+            }
+            else {
+                return false;
             }
         }
         else {
-            if (p.y() < node.point.y()) {
-                node.left = insert(node.left, p, !isVertical);
+            if (p.y() <= node.point.y()) {
+                return true;
             }
             else {
-                node.right = insert(node.right, p, !isVertical);
+                return false;
             }
         }
-
-        return node;
     }
 
     public boolean contains(Point2D p)            // does the set contain point p?
@@ -94,7 +129,7 @@ public class KdTree {
         }
 
         if (node.isVertical) {
-            if (p.x() < node.point.x()) {
+            if (p.x() <= node.point.x()) {
                 return find(node.left, p);
             }
             else {
@@ -102,7 +137,7 @@ public class KdTree {
             }
         }
         else {
-            if (p.y() < node.point.y()) {
+            if (p.y() <= node.point.y()) {
                 return find(node.left, p);
             }
             else {
@@ -137,12 +172,13 @@ public class KdTree {
     private void search(TreeNode node, RectHV rect, ArrayList<Point2D> output) {
         if (node == null)
             return;
+
         if (rect.contains(node.point)) {
             output.add(node.point);
         }
 
         if (node.isVertical) {
-            if (rect.xmin() < node.point.x()) {
+            if (rect.xmin() <= node.point.x()) {
                 search(node.left, rect, output);
             }
 
@@ -151,7 +187,7 @@ public class KdTree {
             }
         }
         else {
-            if (rect.ymin() < node.point.y()) {
+            if (rect.ymin() <= node.point.y()) {
                 search(node.left, rect, output);
             }
 
@@ -167,72 +203,67 @@ public class KdTree {
         if (p == null)
             throw new IllegalArgumentException();
 
-        return null;
+        if (isEmpty())
+            return null;
+
+        return searchNearest(p, root, root, Double.POSITIVE_INFINITY).point;
     }
 
     // currentDistance: the minimum square of distance at this moment
     // node: the subtree to search
-    public TreeNode searchNearest(Point2D p, TreeNode node, double currentDistance) {
+    private TreeNode searchNearest(Point2D p, TreeNode node, TreeNode currentMinNode,
+                                   double currentMinDistance) {
         if (node == null)
-            return null;
+            return currentMinNode;
 
-        currentDistance = Math.min(node.point.distanceSquaredTo(p), currentDistance);
+        double currentDistance = node.point.distanceSquaredTo(p);
+        if (currentDistance < currentMinDistance) {
+            currentMinDistance = currentDistance;
+            currentMinNode = node;
+        }
 
-        TreeNode a = null, b = null;
-
-        if (node.isVertical) {
-
-            // p is left to node, must search left node
-            if (p.x() < node.point.x()) {
-                a = searchNearest(p, node.left, currentDistance);
-                if (node.point.x() - p.x() < currentDistance) {
-                    b = searchNearest(p, node.right, currentDistance);
-                }
-            }
-            // p is right to node, must search right node
-            if (p.x() > node.point.x()) {
-                a = searchNearest(p, node.right, currentDistance);
-                if (p.x() - node.point.x() < currentDistance) {
-                    b = searchNearest(p, node.left, currentDistance);
-                }
-            }
+        TreeNode first, second;
+        if (isLeft(node, p)) {
+            first = node.left;
+            second = node.right;
         }
         else {
-            // p is down to node, must search down node
-            if (p.y() < node.point.y()) {
-                a = searchNearest(p, node.left, currentDistance);
-                if (node.point.y() - p.y() < currentDistance) {
-                    b = searchNearest(p, node.right, currentDistance);
-                }
+            first = node.right;
+            second = node.left;
+        }
+
+        if (first != null && first.rect.distanceSquaredTo(p) < currentMinDistance) {
+            TreeNode left = searchNearest(p, first, currentMinNode, currentMinDistance);
+            currentDistance = left.point.distanceSquaredTo(p);
+            if (currentDistance < currentMinDistance) {
+                currentMinDistance = currentDistance;
+                currentMinNode = left;
             }
-            // p is up to node, must search up node
-            if (p.y() > node.point.y()) {
-                a = searchNearest(p, node.right, currentDistance);
-                if (p.y() - node.point.y() < currentDistance) {
-                    b = searchNearest(p, node.left, currentDistance);
-                }
+        }
+        if (second != null && second.rect.distanceSquaredTo(p) < currentMinDistance) {
+            TreeNode right = searchNearest(p, second, currentMinNode, currentMinDistance);
+            currentDistance = right.point.distanceSquaredTo(p);
+            if (currentDistance < currentMinDistance) {
+                currentMinDistance = currentDistance;
+                currentMinNode = right;
             }
         }
 
-        return minDistance(p, node, minDistance(p, a, b));
-    }
 
-    private TreeNode minDistance(Point2D p, TreeNode a, TreeNode b) {
-        if (a == null)
-            return b;
-        if (b == null)
-            return a;
-        if (a.point.distanceSquaredTo(p) > b.point.distanceSquaredTo(p)) {
-            return b;
-        }
-        else {
-            return a;
-        }
+        return currentMinNode;
     }
 
     public static void main(
             String[] args)                  // unit testing of the methods (optional)
     {
-
+        KdTree tree = new KdTree();
+        tree.insert(new Point2D(0.7, 0.2));
+        tree.insert(new Point2D(0.5, 0.4));
+        tree.insert(new Point2D(0.2, 0.3));
+        tree.insert(new Point2D(0.4, 0.7));
+        tree.insert(new Point2D(0.9, 0.6));
+        tree.insert(new Point2D(0.9, 0.6));
+        StdOut.println(tree.nearest(new Point2D(0.213, 0.531)).toString());
+        StdOut.println(tree.size());
     }
 }

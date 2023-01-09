@@ -55,7 +55,9 @@ public class PointSET {
         Iterator<Point2D> iterator = points.iterator();
         ArrayList<Point2D> rangedPoints = new ArrayList<>();
         while (iterator.hasNext()) {
-            rangedPoints.add(iterator.next());
+            Point2D point = iterator.next();
+            if (rect.contains(point))
+                rangedPoints.add(point);
         }
         return rangedPoints;
     }
